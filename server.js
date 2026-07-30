@@ -16,7 +16,12 @@ const DATA_DIR = path.join(__dirname, "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
-const MAX_HISTORY = 200; // mensajes que se guardan / envían al entrar
+// Hilo: se conservan las últimas N "conversaciones" (mensajes). Al llegar una nueva
+// por encima del tope, se borra la más antigua.
+const MAX_MESSAGES = Number(process.env.MAX_MESSAGES ?? 30);
+// Vida de cada mensaje: se borra al cumplir este tiempo desde que se envió.
+// Por defecto 24h; se puede aumentar con MESSAGE_TTL_HOURS en el entorno.
+const MESSAGE_TTL_MS = Number(process.env.MESSAGE_TTL_HOURS ?? 24) * 60 * 60 * 1000;
 const MAX_AUDIO = 8 * 1024 * 1024; // 8 MB por audio
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -56,28 +61,40 @@ function sembrarCuentas() {
 }
 sembrarCuentas();
 
-// --- Limpieza diaria de mensajes y audios ---
-const RESET_HOUR_UTC = Number(process.env.RESET_HOUR_UTC ?? 5); // ~02:00 en Argentina
-function limpiarDiario() {
-  messages = [];
+// --- Poda del hilo: TTL por mensaje + tope de conversaciones ---
+function borrarAudioDeMensaje(msg) {
+  if (msg && msg.type === "audio" && typeof msg.url === "string") {
+    try {
+      fs.unlinkSync(path.join(UPLOADS_DIR, path.basename(msg.url)));
+    } catch {}
+  }
+}
+
+// Quita los mensajes vencidos (más viejos que MESSAGE_TTL_MS) y recorta el hilo
+// a las últimas MAX_MESSAGES conversaciones. Borra los audios de lo descartado.
+// Devuelve true si hubo cambios.
+function podarMensajes() {
+  const limite = Date.now() - MESSAGE_TTL_MS;
+  const vigentes = [];
+  const descartados = [];
+  for (const m of messages) {
+    (m.ts >= limite ? vigentes : descartados).push(m);
+  }
+  // Recorta al tope: descarta los más antiguos que sobren
+  if (vigentes.length > MAX_MESSAGES) {
+    descartados.push(...vigentes.splice(0, vigentes.length - MAX_MESSAGES));
+  }
+  if (descartados.length === 0) return false;
+  for (const m of descartados) borrarAudioDeMensaje(m);
+  messages = vigentes;
   saveJson(MESSAGES_FILE, messages);
-  try {
-    for (const f of fs.readdirSync(UPLOADS_DIR)) fs.unlinkSync(path.join(UPLOADS_DIR, f));
-  } catch {}
-  console.log("Limpieza diaria: mensajes y audios borrados.");
+  return true;
 }
-function programarLimpieza() {
-  const now = new Date();
-  const next = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), RESET_HOUR_UTC, 0, 0)
-  );
-  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
-  setTimeout(() => {
-    limpiarDiario();
-    setInterval(limpiarDiario, 24 * 60 * 60 * 1000);
-  }, next - now);
-}
-programarLimpieza();
+
+// Poda al arrancar y luego de forma periódica, así el TTL se cumple aunque no
+// lleguen mensajes nuevos.
+podarMensajes();
+setInterval(podarMensajes, 10 * 60 * 1000);
 
 // --- App / sesión ---
 const app = express();
@@ -188,8 +205,9 @@ io.on("connection", (socket) => {
     return;
   }
 
-  // Historial al entrar
-  socket.emit("history", messages.slice(-MAX_HISTORY));
+  // Historial al entrar (podado primero por si algún mensaje ya venció)
+  podarMensajes();
+  socket.emit("history", messages.slice(-MAX_MESSAGES));
   socket.broadcast.emit("system", `${user} se conectó`);
 
   socket.on("message", (text) => {
@@ -197,8 +215,7 @@ io.on("connection", (socket) => {
     if (!text) return;
     const msg = { user, text, ts: Date.now() };
     messages.push(msg);
-    if (messages.length > MAX_HISTORY) messages = messages.slice(-MAX_HISTORY);
-    saveJson(MESSAGES_FILE, messages);
+    podarMensajes();
     io.emit("message", msg);
   });
 
@@ -217,8 +234,7 @@ io.on("connection", (socket) => {
       fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
       const msg = { user, type: "audio", url: `/uploads/${fname}`, ts: Date.now() };
       messages.push(msg);
-      if (messages.length > MAX_HISTORY) messages = messages.slice(-MAX_HISTORY);
-      saveJson(MESSAGES_FILE, messages);
+      podarMensajes();
       io.emit("message", msg);
     } catch (e) {
       console.error("Error guardando audio:", e);
