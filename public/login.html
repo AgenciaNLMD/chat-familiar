@@ -15,7 +15,12 @@
       <div class="perfiles" id="perfiles"></div>
 
       <form id="form" class="hidden">
-        <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+        <div class="pass-field">
+          <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+          <button type="button" id="verPass" class="ver-pass" aria-label="Mostrar contraseña" aria-pressed="false">
+            <span class="ojo" aria-hidden="true">👁️</span>
+          </button>
+        </div>
         <button class="btn" type="submit">Entrar</button>
         <p class="msg-error" id="error"></p>
       </form>
@@ -28,6 +33,16 @@
     const form = document.getElementById("form");
     const passEl = document.getElementById("pass");
     const errorEl = document.getElementById("error");
+    const verPass = document.getElementById("verPass");
+
+    verPass.addEventListener("click", () => {
+      const mostrar = passEl.type === "password";
+      passEl.type = mostrar ? "text" : "password";
+      verPass.classList.toggle("activo", mostrar);
+      verPass.setAttribute("aria-pressed", String(mostrar));
+      verPass.setAttribute("aria-label", mostrar ? "Ocultar contraseña" : "Mostrar contraseña");
+      passEl.focus();
+    });
 
     async function cargarPerfiles() {
       const res = await fetch("/api/perfiles");

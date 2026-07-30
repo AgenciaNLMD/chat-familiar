@@ -14,8 +14,28 @@
         <h2>Chat familiar</h2>
         <div class="who">vos: <strong id="me">…</strong></div>
       </div>
-      <button class="icon-btn" id="logout" title="Salir">🚪</button>
+      <button class="help-btn" id="ayuda" title="Información" aria-label="Información y teléfonos">?</button>
     </header>
+
+    <div class="info-overlay hidden" id="infoOverlay">
+      <div class="info-card">
+        <button class="info-close" id="infoClose" aria-label="Cerrar">×</button>
+        <h3>📞 Teléfonos importantes</h3>
+        <ul class="contactos">
+          <li>
+            <div class="contacto-nombre">Papá</div>
+            <a class="contacto-tel" href="tel:1130720676">11 3072 0676</a>
+            <div class="contacto-dir">General Rivas 527</div>
+          </li>
+          <li>
+            <div class="contacto-nombre">Abuela</div>
+            <a class="contacto-tel" href="tel:1136673968">11 3667 3968</a>
+            <div class="contacto-dir">General Urquiza 1548 · Boedo</div>
+          </li>
+        </ul>
+        <button class="info-logout" id="logout">Cerrar sesión</button>
+      </div>
+    </div>
 
     <div class="messages" id="messages"></div>
 
@@ -232,6 +252,16 @@
       socket.on("system", addSystem);
     }
 
+    // ---- Panel de información / teléfonos ----
+    const infoOverlay = document.getElementById("infoOverlay");
+    document.getElementById("ayuda").onclick = () => infoOverlay.classList.remove("hidden");
+    document.getElementById("infoClose").onclick = () => infoOverlay.classList.add("hidden");
+    infoOverlay.addEventListener("click", (e) => {
+      if (e.target === infoOverlay) infoOverlay.classList.add("hidden");
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") infoOverlay.classList.add("hidden");
+    });
     document.getElementById("logout").onclick = async () => {
       await fetch("/api/logout", { method: "POST" });
       window.location.href = "/login.html";
