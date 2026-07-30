@@ -19,21 +19,11 @@
 
     <div class="info-overlay hidden" id="infoOverlay">
       <div class="info-card">
-        <button class="info-close" id="infoClose" aria-label="Cerrar">×</button>
-        <h3>📞 Teléfonos importantes</h3>
-        <ul class="contactos">
-          <li>
-            <div class="contacto-nombre">Papá</div>
-            <a class="contacto-tel" href="tel:1130720676">11 3072 0676</a>
-            <div class="contacto-dir">General Rivas 527</div>
-          </li>
-          <li>
-            <div class="contacto-nombre">Abuela</div>
-            <a class="contacto-tel" href="tel:1136673968">11 3667 3968</a>
-            <div class="contacto-dir">General Urquiza 1548 · Boedo</div>
-          </li>
-        </ul>
-        <button class="info-logout" id="logout">Cerrar sesión</button>
+        <div class="info-topbar">
+          <button class="info-back hidden" id="infoBack">← Volver</button>
+          <button class="info-close" id="infoClose" aria-label="Salir">×</button>
+        </div>
+        <div id="infoBody"></div>
       </div>
     </div>
 
@@ -252,20 +242,150 @@
       socket.on("system", addSystem);
     }
 
-    // ---- Panel de información / teléfonos ----
-    const infoOverlay = document.getElementById("infoOverlay");
-    document.getElementById("ayuda").onclick = () => infoOverlay.classList.remove("hidden");
-    document.getElementById("infoClose").onclick = () => infoOverlay.classList.add("hidden");
-    infoOverlay.addEventListener("click", (e) => {
-      if (e.target === infoOverlay) infoOverlay.classList.add("hidden");
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") infoOverlay.classList.add("hidden");
-    });
-    document.getElementById("logout").onclick = async () => {
-      await fetch("/api/logout", { method: "POST" });
-      window.location.href = "/login.html";
+    // ---- Panel de información: teléfonos + guía de maltrato ----
+    const CATEGORIAS = {
+      fisico: {
+        titulo: "1. Maltrato físico",
+        desc: "Acciones que causan dolor o lesiones físicas.",
+        ejemplos: [
+          "Tirones de pelo.",
+          "Empujones.",
+          "Golpes, cachetadas o sacudidas.",
+          "Cualquier castigo físico.",
+        ],
+      },
+      psicologico: {
+        titulo: "2. Maltrato psicológico o emocional",
+        desc: "Conductas repetidas que afectan la autoestima, la seguridad o el bienestar emocional del niño.",
+        ejemplos: [
+          "Gritarle de forma habitual.",
+          "Amenazar con que no volverá a ver a su papá.",
+          "Quitarle el celular para impedir que se comunique con su papá.",
+          "Humillarlo, insultarlo o descalificarlo.",
+          "Manipularlo para que rechace al otro progenitor.",
+          "Hacerlo sentir culpable por querer a su padre.",
+        ],
+      },
+      negligencia: {
+        titulo: "3. Negligencia o abandono",
+        desc: "Falta de atención a las necesidades básicas del niño.",
+        ejemplos: [
+          "No brindarle alimentación, higiene o atención médica.",
+          "No garantizar que asista a la escuela.",
+          "Dejarlo solo cuando no tiene edad o condiciones para cuidarse.",
+          "Desentenderse completamente de su educación o necesidades emocionales.",
+        ],
+        nota:
+          "Trabajar y volver tarde: por sí solo no es abandono. No ayudar en las tareas escolares: por sí solo no es abandono; podría ser un indicador de negligencia solo si forma parte de un patrón de desatención importante.",
+      },
+      exposicion: {
+        titulo: "4. Exposición a violencia familiar",
+        desc: "Cuando el niño presencia o queda involucrado en conflictos violentos entre adultos.",
+        ejemplos: [
+          "Presenciar peleas, gritos o agresiones entre sus padres.",
+          "Ser utilizado como mensajero en conflictos.",
+          "Escuchar amenazas constantes entre los adultos.",
+          "Quedar en medio de disputas por la tenencia o el régimen de comunicación.",
+        ],
+      },
     };
+    const INDICE = [
+      { txt: "Tirones de pelo", cat: "fisico", ok: true, veredicto: "✔️ Es Maltrato físico." },
+      { txt: "Gritos frecuentes", cat: "psicologico", ok: true, veredicto: "✔️ Es Maltrato psicológico o emocional." },
+      { txt: "Amenazar con que no verá más a su papá", cat: "psicologico", ok: true, veredicto: "✔️ Es Maltrato psicológico o emocional." },
+      { txt: "Quitarle el celular para impedir el contacto con su papá", cat: "psicologico", ok: true, veredicto: "✔️ Maltrato psicológico o emocional (si el objetivo es impedir el vínculo)." },
+      { txt: "Trabajar muchas horas", cat: "negligencia", ok: false, veredicto: "❌ No constituye abandono por sí mismo." },
+      { txt: "No ayudar con las tareas escolares", cat: "negligencia", ok: false, veredicto: "❌ No constituye abandono por sí mismo, salvo que forme parte de una desatención mucho más amplia y persistente." },
+    ];
+
+    const infoOverlay = document.getElementById("infoOverlay");
+    const infoBody = document.getElementById("infoBody");
+    const infoBack = document.getElementById("infoBack");
+    const infoClose = document.getElementById("infoClose");
+    let vistaStack = [];
+
+    function htmlMenu() {
+      return `
+        <h3>ℹ️ Información</h3>
+        <h4>📞 Teléfonos importantes</h4>
+        <ul class="contactos">
+          <li>
+            <div class="contacto-nombre">Papá</div>
+            <a class="contacto-tel" href="tel:1130720676">11 3072 0676</a>
+            <div class="contacto-dir">General Rivas 527</div>
+          </li>
+          <li>
+            <div class="contacto-nombre">Abuela</div>
+            <a class="contacto-tel" href="tel:1136673968">11 3667 3968</a>
+            <div class="contacto-dir">General Urquiza 1548 · Boedo</div>
+          </li>
+          <li>
+            <div class="contacto-nombre">Infancia y Niñez</div>
+            <a class="contacto-tel" href="tel:52800411">5280 0411</a>
+          </li>
+        </ul>
+        <button class="info-item-btn" data-goto="indice">
+          🛡️ Tipos de maltrato y violencia <span class="chev">›</span>
+        </button>
+        <button class="info-logout" data-action="logout">Cerrar sesión</button>
+      `;
+    }
+    function htmlIndice() {
+      const items = INDICE.map((it, i) => `
+        <button class="indice-item ${it.ok ? "ok" : "no"}" data-goto="detalle" data-idx="${i}">
+          <span class="indice-mark">${it.ok ? "✔️" : "❌"}</span>
+          <span class="indice-txt">${it.txt}</span>
+          <span class="chev">›</span>
+        </button>`).join("");
+      return `
+        <h3>🛡️ Tipos de maltrato</h3>
+        <p class="info-lead">Tocá un ejemplo para ver a qué tipo de maltrato corresponde.</p>
+        <div class="indice-lista">${items}</div>
+      `;
+    }
+    function htmlDetalle(idx) {
+      const it = INDICE[idx];
+      const cat = CATEGORIAS[it.cat];
+      const ejemplos = cat.ejemplos.map((e) => `<li>${e}</li>`).join("");
+      const nota = cat.nota ? `<p class="cat-nota">${cat.nota}</p>` : "";
+      return `
+        <div class="veredicto ${it.ok ? "ok" : "no"}">${it.veredicto}</div>
+        <h3>${cat.titulo}</h3>
+        <p class="cat-desc">${cat.desc}</p>
+        <h4>Ejemplos</h4>
+        <ul class="cat-ejemplos">${ejemplos}</ul>
+        ${nota}
+      `;
+    }
+
+    function renderInfo() {
+      const cur = vistaStack[vistaStack.length - 1];
+      infoBack.classList.toggle("hidden", vistaStack.length <= 1);
+      if (cur.vista === "indice") infoBody.innerHTML = htmlIndice();
+      else if (cur.vista === "detalle") infoBody.innerHTML = htmlDetalle(cur.arg);
+      else infoBody.innerHTML = htmlMenu();
+      infoBody.scrollTop = 0;
+    }
+    function irA(vista, arg) { vistaStack.push({ vista, arg }); renderInfo(); }
+    function abrirInfo() { vistaStack = [{ vista: "menu" }]; renderInfo(); infoOverlay.classList.remove("hidden"); }
+    function cerrarInfo() { infoOverlay.classList.add("hidden"); }
+
+    document.getElementById("ayuda").onclick = abrirInfo;
+    infoClose.onclick = cerrarInfo;
+    infoBack.onclick = () => { if (vistaStack.length > 1) { vistaStack.pop(); renderInfo(); } };
+    infoOverlay.addEventListener("click", (e) => { if (e.target === infoOverlay) cerrarInfo(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarInfo(); });
+    infoBody.addEventListener("click", async (e) => {
+      const el = e.target.closest("[data-goto],[data-action]");
+      if (!el) return;
+      if (el.dataset.action === "logout") {
+        await fetch("/api/logout", { method: "POST" });
+        window.location.href = "/login.html";
+        return;
+      }
+      if (el.dataset.goto === "indice") irA("indice");
+      else if (el.dataset.goto === "detalle") irA("detalle", Number(el.dataset.idx));
+    });
 
     init();
   </script>
