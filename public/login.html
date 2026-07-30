@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar · Chat</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>💬 Chat familiar</h1>
+      <p class="sub">¿Quién sos?</p>
+
+      <div class="perfiles" id="perfiles"></div>
+
+      <form id="form" class="hidden">
+        <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+        <button class="btn" type="submit">Entrar</button>
+        <p class="msg-error" id="error"></p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let selected = null;
+    const perfilesEl = document.getElementById("perfiles");
+    const form = document.getElementById("form");
+    const passEl = document.getElementById("pass");
+    const errorEl = document.getElementById("error");
+
+    async function cargarPerfiles() {
+      const res = await fetch("/api/perfiles");
+      const perfiles = await res.json();
+      perfilesEl.innerHTML = "";
+      perfiles.forEach((p) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "perfil";
+        card.innerHTML =
+          `<img class="perfil-avatar" src="${p.avatar}" alt="${p.nombre}" />` +
+          `<span class="perfil-nombre">${p.nombre}</span>`;
+        card.onclick = () => seleccionar(p, card);
+        perfilesEl.appendChild(card);
+      });
+    }
+
+    function seleccionar(p, card) {
+      selected = p.user;
+      errorEl.textContent = "";
+      passEl.value = "";
+      document.querySelectorAll(".perfil").forEach((c) => c.classList.remove("active"));
+      card.classList.add("active");
+      form.classList.remove("hidden");
+      passEl.focus();
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      if (!selected) { errorEl.textContent = "Elegí un perfil."; return; }
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: selected, pass: passEl.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errorEl.textContent = data.error || "Error"; return; }
+        window.location.href = "/chat.html";
+      } catch {
+        errorEl.textContent = "No se pudo conectar al servidor.";
+      }
+    });
+
+    cargarPerfiles();
+  </script>
+</body>
+</html>

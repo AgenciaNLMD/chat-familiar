@@ -1,0 +1,21 @@
+{
+  "name": "ninos-chat",
+  "version": "1.0.0",
+  "description": "Canal de comunicación estilo chat con login (local).",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "socket.io": "^4.7.5"
+  }
+}

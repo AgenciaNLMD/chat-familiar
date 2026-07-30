@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="chat-page">
+    <header class="chat-header">
+      <img class="avatar-img" id="header-avatar" alt="" />
+      <div class="title">
+        <h2>Chat familiar</h2>
+        <div class="who">vos: <strong id="me">…</strong></div>
+      </div>
+      <button class="icon-btn" id="logout" title="Salir">🚪</button>
+    </header>
+
+    <div class="messages" id="messages"></div>
+
+    <form class="composer" id="composer">
+      <button type="button" class="attach-btn" id="attach" title="Adjuntar (próximamente)">+</button>
+      <div class="input-pill">
+        <input id="input" type="text" placeholder="Escribí un mensaje" autocomplete="off" maxlength="1000" />
+        <span id="rec-indicator" class="rec-indicator hidden">
+          <span class="rec-dot"></span> Grabando <span id="rec-time">0:00</span>
+        </span>
+      </div>
+      <button type="button" class="round-btn" id="action" title="Grabar o enviar"></button>
+    </form>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const ICON_MIC =
+      '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>';
+    const ICON_STOP =
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    const ICON_SEND =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+    const MAX_SEG = 30; // segundos máximos de grabación
+
+    let me = null;
+    let socket = null;
+    let perfiles = {}; // user -> { nombre, avatar }
+    const messagesEl = document.getElementById("messages");
+    const input = document.getElementById("input");
+    const actionBtn = document.getElementById("action");
+    const recInd = document.getElementById("rec-indicator");
+    const recTime = document.getElementById("rec-time");
+
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+    function hora(ts) {
+      return new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    }
+    function scrollDown() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    function cuerpo(m) {
+      if (m.type === "audio") {
+        return `<audio controls preload="metadata" src="${m.url}"></audio>`;
+      }
+      return `<div>${esc(m.text)}</div>`;
+    }
+    function addMessage(m) {
+      const mine = m.user === me;
+      const p = perfiles[m.user] || {};
+      const nombre = p.nombre || m.user;
+
+      const row = document.createElement("div");
+      row.className = "msg-row " + (mine ? "mine" : "other");
+
+      if (!mine && p.avatar) {
+        const av = document.createElement("img");
+        av.className = "bubble-avatar";
+        av.src = p.avatar;
+        av.alt = nombre;
+        row.appendChild(av);
+      }
+
+      const div = document.createElement("div");
+      div.className = "bubble " + (mine ? "mine" : "other");
+      div.innerHTML =
+        (mine ? "" : `<div class="name">${esc(nombre)}</div>`) +
+        cuerpo(m) +
+        `<div class="time">${hora(m.ts)}</div>`;
+      row.appendChild(div);
+      messagesEl.appendChild(row);
+    }
+    function addSystem(text) {
+      const div = document.createElement("div");
+      div.className = "system-line";
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      scrollDown();
+    }
+
+    // ---- Botón: micrófono cuando está vacío, enviar cuando hay texto ----
+    let mediaRecorder = null;
+    let chunks = [];
+    let audioSupported = false;
+    let recTimer = null;
+    let recStart = 0;
+
+    function startRecUI() {
+      recStart = Date.now();
+      input.classList.add("hidden");
+      recInd.classList.remove("hidden");
+      recTime.textContent = "0:00";
+      recTimer = setInterval(() => {
+        const s = Math.floor((Date.now() - recStart) / 1000);
+        recTime.textContent = `0:${String(s).padStart(2, "0")}`;
+        if (s >= MAX_SEG && mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+        }
+      }, 250);
+    }
+    function stopRecUI() {
+      clearInterval(recTimer);
+      recTimer = null;
+      input.classList.remove("hidden");
+      recInd.classList.add("hidden");
+    }
+
+    function pickMime() {
+      const cands = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+      for (const c of cands) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+      }
+      return "";
+    }
+    function refreshAction() {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        actionBtn.innerHTML = ICON_STOP;
+        actionBtn.classList.add("recording");
+        return;
+      }
+      actionBtn.classList.remove("recording");
+      actionBtn.innerHTML = input.value.trim().length > 0 ? ICON_SEND : ICON_MIC;
+    }
+    function sendText() {
+      const text = input.value.trim();
+      if (!text) return;
+      socket.emit("message", text);
+      input.value = "";
+      refreshAction();
+      input.focus();
+    }
+    async function startRec() {
+      if (!audioSupported) {
+        alert("El micrófono necesita https (usá el túnel de VS Code) o abrir el chat en la PC.");
+        return;
+      }
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        alert("No se pudo acceder al micrófono. Revisá los permisos del navegador.");
+        return;
+      }
+      const mime = pickMime();
+      mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunks = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        stopRecUI();
+        refreshAction();
+        const blob = new Blob(chunks, { type: mime || "audio/webm" });
+        if (!blob.size) return;
+        const buf = await blob.arrayBuffer();
+        socket.emit("audio", { mime: blob.type, data: buf });
+      };
+      mediaRecorder.start();
+      startRecUI();
+      refreshAction();
+    }
+
+    actionBtn.onclick = () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); return; }
+      if (input.value.trim()) { sendText(); return; }
+      startRec();
+    };
+    input.addEventListener("input", refreshAction);
+    document.getElementById("composer").addEventListener("submit", (e) => {
+      e.preventDefault();
+      sendText();
+    });
+
+    // Un solo audio reproduciéndose a la vez: al dar play a uno, se pausan los demás.
+    messagesEl.addEventListener(
+      "play",
+      (e) => {
+        messagesEl.querySelectorAll("audio").forEach((a) => {
+          if (a !== e.target) a.pause();
+        });
+      },
+      true
+    );
+
+    async function init() {
+      const res = await fetch("/api/me");
+      const data = await res.json();
+      if (!data.user) { window.location.href = "/login.html"; return; }
+      me = data.user;
+      document.getElementById("me").textContent = data.nombre || me;
+      if (data.avatar) document.getElementById("header-avatar").src = data.avatar;
+
+      // Mapa de avatares para las burbujas
+      try {
+        const lista = await (await fetch("/api/perfiles")).json();
+        lista.forEach((p) => { perfiles[p.user] = { nombre: p.nombre, avatar: p.avatar }; });
+      } catch {}
+
+      audioSupported = !!(
+        navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder
+      );
+      refreshAction();
+
+      socket = io();
+      socket.on("history", (msgs) => {
+        messagesEl.innerHTML = "";
+        msgs.forEach(addMessage);
+        scrollDown();
+      });
+      socket.on("message", (m) => { addMessage(m); scrollDown(); });
+      socket.on("system", addSystem);
+    }
+
+    document.getElementById("logout").onclick = async () => {
+      await fetch("/api/logout", { method: "POST" });
+      window.location.href = "/login.html";
+    };
+
+    init();
+  </script>
+</body>
+</html>

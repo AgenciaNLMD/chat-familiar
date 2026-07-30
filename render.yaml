@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: chat-familiar
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PAPA_PASS
+        sync: false
+      - key: NOAH_PASS
+        sync: false
+      - key: LUMI_PASS
+        sync: false
