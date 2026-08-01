@@ -96,6 +96,30 @@ function podarMensajes() {
 podarMensajes();
 setInterval(podarMensajes, 10 * 60 * 1000);
 
+// --- Aviso por WhatsApp (CallMeBot) ---
+// Manda un aviso al WhatsApp de papá cada vez que entra un mensaje.
+// Gratis y sin dependencias: usa el fetch nativo de Node 18+.
+// Configurar en el entorno: CALLMEBOT_PHONE (número con código de país, sin +)
+// y CALLMEBOT_APIKEY (la key que da el bot). Si faltan, no hace nada.
+const CALLMEBOT_PHONE = process.env.CALLMEBOT_PHONE || "";
+const CALLMEBOT_APIKEY = process.env.CALLMEBOT_APIKEY || "";
+// Usuario que recibe los avisos: no tiene sentido avisarle de sus propios mensajes.
+const AVISO_EXCLUIR = (process.env.CALLMEBOT_EXCLUIR || "papa").toLowerCase();
+
+async function avisarWhatsApp(texto) {
+  if (!CALLMEBOT_PHONE || !CALLMEBOT_APIKEY) return;
+  try {
+    const url =
+      "https://api.callmebot.com/whatsapp.php" +
+      `?phone=${encodeURIComponent(CALLMEBOT_PHONE)}` +
+      `&text=${encodeURIComponent(texto)}` +
+      `&apikey=${encodeURIComponent(CALLMEBOT_APIKEY)}`;
+    await fetch(url);
+  } catch (e) {
+    console.error("Error avisando por WhatsApp:", e);
+  }
+}
+
 // --- App / sesión ---
 const app = express();
 const server = http.createServer(app);
@@ -217,6 +241,7 @@ io.on("connection", (socket) => {
     messages.push(msg);
     podarMensajes();
     io.emit("message", msg);
+    if (user.toLowerCase() !== AVISO_EXCLUIR) avisarWhatsApp(`💬 ${user}: ${text}`);
   });
 
   socket.on("audio", (payload) => {
@@ -236,6 +261,7 @@ io.on("connection", (socket) => {
       messages.push(msg);
       podarMensajes();
       io.emit("message", msg);
+      if (user.toLowerCase() !== AVISO_EXCLUIR) avisarWhatsApp(`🎤 ${user} te envió un audio`);
     } catch (e) {
       console.error("Error guardando audio:", e);
     }
