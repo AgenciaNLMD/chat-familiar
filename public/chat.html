@@ -261,6 +261,8 @@
           "Gritarle de forma habitual.",
           "Amenazar con que no volverá a ver a su papá.",
           "Quitarle el celular para impedir que se comunique con su papá.",
+          "Bloquear o desinstalar WhatsApp u otras apps para que no pueda comunicarse con su papá o familiares.",
+          "Revisar, borrar o controlar sus mensajes para impedir el contacto con su familia.",
           "Humillarlo, insultarlo o descalificarlo.",
           "Manipularlo para que rechace al otro progenitor.",
           "Hacerlo sentir culpable por querer a su padre.",
@@ -294,9 +296,29 @@
       { txt: "Gritos frecuentes", cat: "psicologico", ok: true, veredicto: "✔️ Es Maltrato psicológico o emocional." },
       { txt: "Amenazar con que no verá más a su papá", cat: "psicologico", ok: true, veredicto: "✔️ Es Maltrato psicológico o emocional." },
       { txt: "Quitarle el celular para impedir el contacto con su papá", cat: "psicologico", ok: true, veredicto: "✔️ Maltrato psicológico o emocional (si el objetivo es impedir el vínculo)." },
+      { txt: "Bloquear WhatsApp para que no hable con su papá o familiares", cat: "psicologico", ok: true, veredicto: "✔️ Es Maltrato psicológico o emocional. Impedir la comunicación con un progenitor o familiares afecta el vínculo y el bienestar del niño." },
       { txt: "Trabajar muchas horas", cat: "negligencia", ok: false, veredicto: "❌ No constituye abandono por sí mismo." },
       { txt: "No ayudar con las tareas escolares", cat: "negligencia", ok: false, veredicto: "❌ No constituye abandono por sí mismo, salvo que forme parte de una desatención mucho más amplia y persistente." },
     ];
+
+    const DISCIPLINA_VS = {
+      disciplina: [
+        "Busca enseñar, guiar y ayudar al niño a entender los límites.",
+        "Respeta su dignidad: nunca lo humilla, insulta ni lo lastima.",
+        "Es proporcional y explicada: el niño entiende por qué.",
+        "Se hace con calma y autocontrol, no desde la ira.",
+        "Ejemplos: hablar y explicar, acordar consecuencias razonables (por ejemplo menos tiempo de pantalla), reforzar lo positivo.",
+      ],
+      violencia: [
+        "Busca imponer, castigar o desahogar el enojo del adulto.",
+        "Daña física o emocionalmente: golpes, gritos, humillaciones, amenazas.",
+        "Es desproporcionada, impredecible o cruel.",
+        "Se hace desde la ira y la pérdida de control.",
+        "Ejemplos: cachetadas o golpes, gritos habituales, amenazar con no verlo más, bloquearle el contacto con su papá o familiares.",
+      ],
+      clave:
+        "La disciplina educa y cuida; la violencia lastima y controla. Ningún castigo físico ni humillación es disciplina: siempre es violencia.",
+    };
 
     const infoOverlay = document.getElementById("infoOverlay");
     const infoBody = document.getElementById("infoBody");
@@ -326,6 +348,9 @@
         </ul>
         <button class="info-item-btn" data-goto="indice">
           🛡️ Tipos de maltrato y violencia <span class="chev">›</span>
+        </button>
+        <button class="info-item-btn" data-goto="disciplina">
+          ⚖️ Diferencia entre disciplina y violencia <span class="chev">›</span>
         </button>
         <button class="info-logout" data-action="logout">Cerrar sesión</button>
       `;
@@ -358,11 +383,26 @@
       `;
     }
 
+    function htmlDisciplina() {
+      const disc = DISCIPLINA_VS.disciplina.map((e) => `<li>${e}</li>`).join("");
+      const viol = DISCIPLINA_VS.violencia.map((e) => `<li>${e}</li>`).join("");
+      return `
+        <h3>⚖️ Disciplina vs. violencia</h3>
+        <p class="info-lead">Educar y poner límites no es lo mismo que lastimar. Estas son las diferencias.</p>
+        <div class="veredicto ok">✅ Disciplina (educa y cuida)</div>
+        <ul class="cat-ejemplos">${disc}</ul>
+        <div class="veredicto no">🚫 Violencia (lastima y controla)</div>
+        <ul class="cat-ejemplos">${viol}</ul>
+        <p class="cat-nota">${DISCIPLINA_VS.clave}</p>
+      `;
+    }
+
     function renderInfo() {
       const cur = vistaStack[vistaStack.length - 1];
       infoBack.classList.toggle("hidden", vistaStack.length <= 1);
       if (cur.vista === "indice") infoBody.innerHTML = htmlIndice();
       else if (cur.vista === "detalle") infoBody.innerHTML = htmlDetalle(cur.arg);
+      else if (cur.vista === "disciplina") infoBody.innerHTML = htmlDisciplina();
       else infoBody.innerHTML = htmlMenu();
       infoBody.scrollTop = 0;
     }
@@ -384,6 +424,7 @@
         return;
       }
       if (el.dataset.goto === "indice") irA("indice");
+      else if (el.dataset.goto === "disciplina") irA("disciplina");
       else if (el.dataset.goto === "detalle") irA("detalle", Number(el.dataset.idx));
     });
 
