@@ -1,29 +1,24 @@
-# Chat (niños)
+# Chat Familiar - Chatbot Inteligente para Familias
 
-Canal de comunicación estilo chat, con usuario y contraseña. Para uso local.
+**Sistema de chat inteligente para comunicación familiar y atención al cliente**
 
-## Stack
+Chat Familiar es un chatbot especializado que facilita la comunicación entre familias, educadores y profesionales. Integrado con WhatsApp y otros canales para una experiencia omnicanal.
 
-- **Express** + **express-session** — servidor y login con sesión por cookie
-- **Socket.io** — mensajes en tiempo real
-- **bcryptjs** — contraseñas hasheadas
-- **Archivos JSON** (`data/`) — usuarios y mensajes (sin base de datos)
+## 💬 Características
 
-## Uso
+- **Chat Inteligente** - Respuestas contextuales y personalización
+- **WhatsApp Integration** - Disponible directamente en WhatsApp
+- **Múltiples Canales** - Telegram, SMS, Web
+- **Histórico de Conversaciones** - Registro completo de chats
+- **Notificaciones** - Alertas en tiempo real
+- **Escalado Automático** - Derivación a agentes humanos cuando es necesario
 
-```bash
-npm install
-npm start
 ```
 
-Luego abrir **http://localhost:3004** en el navegador.
+## 📝 Licencia
 
-- La primera vez, crear una cuenta desde la pestaña **Crear cuenta**.
-- Los datos se guardan en `data/users.json` y `data/messages.json` (ignorados por git).
+**Propietario** - Todos los derechos reservados.
 
-## Notas
+---
 
-- Registro abierto y una sala común de chat.
-- El historial guarda los últimos 200 mensajes.
-- Para exponerlo fuera de tu red hace falta HTTPS y `SESSION_SECRET` fijo
-  (variable de entorno). Por ahora está pensado para correr local.
+Desarrollado por **AgenciaNLMD** | 2026
