@@ -301,6 +301,16 @@
       { txt: "No ayudar con las tareas escolares", cat: "negligencia", ok: false, veredicto: "❌ No constituye abandono por sí mismo, salvo que forme parte de una desatención mucho más amplia y persistente." },
     ];
 
+    const ALINEACION = [
+      { txt: "Decirle que su papá no lo quiere", ok: true, explicacion: "Es alineación parental. Distorsiona la realidad para que el niño rechace al otro progenitor." },
+      { txt: "Hablar mal constantemente del otro progenitor", ok: true, explicacion: "Es alineación parental. Bombardearlo con críticas crea una imagen falsa y lo presiona a elegir un bando." },
+      { txt: "Bloquearle el acceso al otro progenitor sin motivo legal", ok: true, explicacion: "Es alineación parental. Impedir la relación es una forma de manipulación emocional." },
+      { txt: "Sobornarlo o castigarlo según lo que diga sobre el otro padre", ok: true, explicacion: "Es alineación parental. Lo coloca como espía o intermediario, dañando su independencia emocional." },
+      { txt: "Decirle que el otro progenitor lo abandonó o no pagó manutención", ok: true, explicacion: "Es alineación parental. Culpabilizar al otro padre y cargar emocionalmente al niño con asuntos de adultos." },
+      { txt: "Cambiarle el teléfono para que no pueda llamar al otro padre", ok: true, explicacion: "Es alineación parental. Aislar al niño de su otro progenitor impidiéndole la comunicación." },
+      { txt: "Decirle que tiene que elegir con quién quiere vivir", ok: true, explicacion: "Es alineación parental. Poner al niño en una posición imposible de decidir lealtades y hacerlo responsable del conflicto adulto." },
+    ];
+
     const DISCIPLINA_VS = {
       disciplina: [
         "Busca enseñar, guiar y ayudar al niño a entender los límites.",
@@ -352,6 +362,9 @@
         <button class="info-item-btn" data-goto="disciplina">
           ⚖️ Diferencia entre disciplina y violencia <span class="chev">›</span>
         </button>
+        <button class="info-item-btn" data-goto="alineacion">
+          ⚠️ Alineación parental <span class="chev">›</span>
+        </button>
         <button class="info-logout" data-action="logout">Cerrar sesión</button>
       `;
     }
@@ -397,12 +410,48 @@
       `;
     }
 
+    function htmlAlineacion() {
+      const items = ALINEACION.map((it, i) => `
+        <button class="indice-item ok" data-goto="alineacion-detalle" data-idx="${i}">
+          <span class="indice-mark">⚠️</span>
+          <span class="indice-txt">${it.txt}</span>
+          <span class="chev">›</span>
+        </button>`).join("");
+      return `
+        <h3>⚠️ Alineación parental</h3>
+        <p class="info-lead">Es cuando un adulto intenta que el niño rechace o se aleje del otro progenitor. Tocá un ejemplo para ver más.</p>
+        <div class="indice-lista">${items}</div>
+      `;
+    }
+
+    function htmlAlineacionDetalle(idx) {
+      const it = ALINEACION[idx];
+      return `
+        <div class="veredicto ok">⚠️ Es alineación parental</div>
+        <h3>${it.txt}</h3>
+        <p class="cat-desc">${it.explicacion}</p>
+        <h4>¿Por qué es alineación parental?</h4>
+        <p class="cat-desc">La alineación parental es cuando un progenitor intenta que el niño rechace al otro a través de:</p>
+        <ul class="cat-ejemplos">
+          <li>Mentiras o distorsiones de la realidad</li>
+          <li>Críticas constantes y bombardeo emocional</li>
+          <li>Restricción del contacto o la comunicación</li>
+          <li>Manipulación emocional (sobornos, castigos, culpa)</li>
+          <li>Usarlo como espía o intermediario en conflictos</li>
+          <li>Ponerlo a elegir lealtades</li>
+        </ul>
+        <p class="cat-nota"><strong>Impacto en el niño:</strong> Confusión emocional, lealtades divididas, culpa, baja autoestima, y daño en su relación con ambos padres.</p>
+      `;
+    }
+
     function renderInfo() {
       const cur = vistaStack[vistaStack.length - 1];
       infoBack.classList.toggle("hidden", vistaStack.length <= 1);
       if (cur.vista === "indice") infoBody.innerHTML = htmlIndice();
       else if (cur.vista === "detalle") infoBody.innerHTML = htmlDetalle(cur.arg);
       else if (cur.vista === "disciplina") infoBody.innerHTML = htmlDisciplina();
+      else if (cur.vista === "alineacion") infoBody.innerHTML = htmlAlineacion();
+      else if (cur.vista === "alineacion-detalle") infoBody.innerHTML = htmlAlineacionDetalle(cur.arg);
       else infoBody.innerHTML = htmlMenu();
       infoBody.scrollTop = 0;
     }
@@ -425,7 +474,9 @@
       }
       if (el.dataset.goto === "indice") irA("indice");
       else if (el.dataset.goto === "disciplina") irA("disciplina");
+      else if (el.dataset.goto === "alineacion") irA("alineacion");
       else if (el.dataset.goto === "detalle") irA("detalle", Number(el.dataset.idx));
+      else if (el.dataset.goto === "alineacion-detalle") irA("alineacion-detalle", Number(el.dataset.idx));
     });
 
     init();
