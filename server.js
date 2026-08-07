@@ -155,7 +155,9 @@ const sessionMiddleware = session({
     httpOnly: true,
     sameSite: "lax",
     secure: "auto", // cookie segura sólo cuando la conexión es https
-    maxAge: 1000 * 60 * 60 * 24 * 7,
+    // Sin maxAge: cookie de sesión pura. El navegador la borra al cerrarse
+    // (no con solo cerrar una pestaña si quedan otras abiertas), y ahí
+    // vuelve a pedir usuario y contraseña. Los mensajes no dependen de esto.
   },
 });
 app.use(sessionMiddleware);
