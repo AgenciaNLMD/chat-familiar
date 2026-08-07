@@ -12,7 +12,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3004;
 
 // --- Almacenamiento simple en archivos JSON ---
-const DATA_DIR = path.join(__dirname, "data");
+// DATA_DIR se puede fijar por variable de entorno para que coincida exactamente
+// con el punto de montaje del volumen persistente (ej. Easypanel). Si no se
+// define, cae en <carpeta del server.js>/data.
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(__dirname, "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
@@ -24,8 +29,14 @@ const MAX_MESSAGES = Number(process.env.MAX_MESSAGES ?? 30);
 const MESSAGE_TTL_MS = Number(process.env.MESSAGE_TTL_HOURS ?? 24) * 60 * 60 * 1000;
 const MAX_AUDIO = 8 * 1024 * 1024; // 8 MB por audio
 
+// Diagnóstico de arranque: si DATA_DIR ya existía y tenía mensajes, el volumen
+// persistió entre reinicios/deploys. Si aparece "existía: false" o "0 mensajes"
+// después de un deploy previo con conversaciones, el volumen NO está mapeado
+// al mismo path que usa la app (revisar el punto de montaje en Easypanel).
+const dataDirExistiaAntes = fs.existsSync(DATA_DIR);
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+console.log(`[storage] DATA_DIR = ${DATA_DIR} (existía antes de arrancar: ${dataDirExistiaAntes})`);
 
 function loadJson(file, fallback) {
   try {
@@ -40,6 +51,7 @@ function saveJson(file, data) {
 
 let users = loadJson(USERS_FILE, {}); // { usuario: { hash, nombre, avatar } }
 let messages = loadJson(MESSAGES_FILE, []); // [ { user, text|type/url, ts } ]
+console.log(`[storage] cargados ${Object.keys(users).length} usuarios y ${messages.length} mensajes desde disco`);
 
 // --- Sembrado de cuentas (producción con disco efímero) ---
 // Crea papa/noah/lumi al arrancar si su contraseña está en el entorno.
