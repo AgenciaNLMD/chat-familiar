@@ -253,7 +253,9 @@ io.on("connection", (socket) => {
     if (!text) return;
     const msg = { user, text, ts: Date.now() };
     messages.push(msg);
-    podarMensajes();
+    // podarMensajes() sólo guarda a disco si podó algo; si no, guardamos acá
+    // para que todo mensaje nuevo quede persistido siempre.
+    if (!podarMensajes()) saveJson(MESSAGES_FILE, messages);
     io.emit("message", msg);
     if (user.toLowerCase() !== AVISO_EXCLUIR) avisarWhatsApp(`💬 ${user}: ${text}`);
   });
@@ -273,7 +275,7 @@ io.on("connection", (socket) => {
       fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
       const msg = { user, type: "audio", url: `/uploads/${fname}`, ts: Date.now() };
       messages.push(msg);
-      podarMensajes();
+      if (!podarMensajes()) saveJson(MESSAGES_FILE, messages);
       io.emit("message", msg);
       if (user.toLowerCase() !== AVISO_EXCLUIR) avisarWhatsApp(`🎤 ${user} te envió un audio`);
     } catch (e) {
